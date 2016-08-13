@@ -22,6 +22,10 @@ public class Maxwell {
 	private MaxwellContext context;
 	static final Logger LOGGER = LoggerFactory.getLogger(Maxwell.class);
 
+	public Maxwell(MaxwellConfig config) {
+		this.config = config;
+	}
+
 	protected BinlogPosition getInitialPosition() throws SQLException {
 		BinlogPosition initial = this.context.getInitialPosition();
 		if ( initial == null ) {
@@ -41,16 +45,12 @@ public class Maxwell {
 		return initial;
 	}
 
-	private void run(String[] argv) throws Exception {
-		this.config = new MaxwellConfig(argv);
-
+	private void run() throws Exception {
 		if ( this.config.log_level != null )
 			MaxwellLogging.setLevel(this.config.log_level);
 
 		this.context = new MaxwellContext(this.config);
-
 		this.context.probeConnections();
-
 
  		BinlogPosition initialPosition = null;
 		try ( Connection connection = this.context.getReplicationConnection();
@@ -98,12 +98,12 @@ public class Maxwell {
 
 		this.context.start();
 		p.runLoop();
-
 	}
 
 	public static void main(String[] args) {
 		try {
-			new Maxwell().run(args);
+			MaxwellConfig config = new MaxwellConfig(args);
+			new Maxwell(config).run();
 		} catch ( Exception e ) {
 			e.printStackTrace();
 			System.exit(1);

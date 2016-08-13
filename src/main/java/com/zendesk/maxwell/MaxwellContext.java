@@ -45,7 +45,7 @@ public class MaxwellContext {
 		this.replicationConnectionPool = new ConnectionPool("ReplicationConnectionPool", 10, 0, 10,
 				config.replicationMysql.getConnectionURI(), config.replicationMysql.user, config.replicationMysql.password);
 
-		this.rawMaxwellConnectionPool = new ConnectionPool("RawMaxwellConenectionPool", 1, 2, 100,
+		this.rawMaxwellConnectionPool = new ConnectionPool("RawMaxwellConnectionPool", 1, 2, 100,
 			config.maxwellMysql.getConnectionURI(false), config.maxwellMysql.user, config.maxwellMysql.password);
 
 		this.maxwellConnectionPool = new ConnectionPool("MaxwellConnectionPool", 10, 0, 10,
@@ -117,7 +117,7 @@ public class MaxwellContext {
 	}
 
 	public Pair<Long,Long> getRecoveryInfo() throws SQLException {
-		return null;
+		return this.positionStore.getRecoveryInfo();
 	}
 
 	public void setPosition(RowMap r) throws SQLException {

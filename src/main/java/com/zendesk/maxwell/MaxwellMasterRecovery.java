@@ -21,8 +21,8 @@ public class MaxwellMasterRecovery {
 	}
 
 	public BinlogPosition recover() throws SQLException {
-		LOGGER.info("attempting to recover from master-change (from server-id "
-			+ masterServerID + ", heartbeat" + targetHeartbeat);
+		String recoveryMsg = String.format("old-server-id %d, heartbeat %d", masterServerID, targetHeartbeat);
+		LOGGER.info("attempting to recover from master-change: " + recoveryMsg);
 
 		List<BinlogPosition> list = getBinlogInfo();
 		for ( int i = list.size() - 1; i >= 0 ; i-- ) {
@@ -31,6 +31,8 @@ public class MaxwellMasterRecovery {
 
 			//MaxwellReplicator replicator = new MaxwellReplicator()
 		}
+
+		LOGGER.warn("Could not recover from master-change: " + recoveryMsg);
 		return null;
 	}
 
