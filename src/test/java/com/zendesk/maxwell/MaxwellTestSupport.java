@@ -67,7 +67,7 @@ public class MaxwellTestSupport {
 	}
 
 
-	public static MaxwellContext buildContext(int port, BinlogPosition p, MaxwellFilter filter) {
+	public static MaxwellContext buildContext(int port, BinlogPosition p, MaxwellFilter filter) throws SQLException {
 		MaxwellConfig config = new MaxwellConfig();
 
 		config.replicationMysql.host = "127.0.0.1";
@@ -92,8 +92,9 @@ public class MaxwellTestSupport {
 		mysql.getConnection().prepareStatement("delete from `maxwell`.`schemas`").execute();
 	}
 
-	public static List<RowMap>getRowsForSQL(final MysqlIsolatedServer mysql, MaxwellFilter filter, String queries[], String before[], boolean transactional) throws Exception {
-		MaxwellContext context = buildContext(mysql.getPort(), null, filter);
+	public static List<RowMap>getRowsForSQL(final MysqlIsolatedServer mysql, MaxwellContext context, MaxwellFilter filter, String queries[], String before[], boolean transactional) throws Exception {
+		if ( context == null )
+			context = buildContext(mysql.getPort(), null, filter);
 
 		clearSchemaStore(mysql);
 
@@ -197,6 +198,6 @@ public class MaxwellTestSupport {
 
 
 	public static  List<RowMap>getRowsForSQL(MysqlIsolatedServer server, MaxwellFilter filter, String queries[]) throws Exception {
-		return getRowsForSQL(server, filter, queries, null, false);
+		return getRowsForSQL(server, null, filter, queries, null, false);
 	}
 }

@@ -337,7 +337,7 @@ public class MaxwellIntegrationTest extends MaxwellTestWithIsolatedServer {
 			"insert into `test`.`tootootwee` set id = 5"
 		};
 
-		List<RowMap> rows = MaxwellTestSupport.getRowsForSQL(lowerCaseServer, null, sql, null, false);
+		List<RowMap> rows = MaxwellTestSupport.getRowsForSQL(lowerCaseServer, null, null, sql, null, false);
 		assertThat(rows.size(), is(1));
 		assertThat(rows.get(0).getTable(), is("tootootwee"));
 	}

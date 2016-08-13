@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.concurrent.TimeoutException;
 import com.djdch.log4j.StaticShutdownCallbackRegistry;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +22,25 @@ public class Maxwell {
 	private MaxwellContext context;
 	static final Logger LOGGER = LoggerFactory.getLogger(Maxwell.class);
 
+	protected BinlogPosition getInitialPosition() throws SQLException {
+		BinlogPosition initial = this.context.getInitialPosition();
+		if ( initial == null ) {
+			Pair<Long, Long> recoveryInfo = this.context.getRecoveryInfo();
+
+			if ( recoveryInfo != null ) {
+				MaxwellMasterRecovery masterRecovery = new MaxwellMasterRecovery(this.context, recoveryInfo.getLeft(), recoveryInfo.getRight());
+				initial = masterRecovery.recover();
+			}
+		}
+
+		if ( initial == null ) {
+			try ( Connection c = context.getReplicationConnection() ) {
+				initial = BinlogPosition.capture(c);
+			}
+		}
+		return initial;
+	}
+
 	private void run(String[] argv) throws Exception {
 		this.config = new MaxwellConfig(argv);
 
@@ -31,6 +51,8 @@ public class Maxwell {
 
 		this.context.probeConnections();
 
+
+ 		BinlogPosition initialPosition = null;
 		try ( Connection connection = this.context.getReplicationConnection();
 			  Connection rawConnection = this.context.getRawMaxwellConnection() ) {
 			MaxwellMysqlStatus.ensureReplicationMysqlState(connection);
@@ -40,11 +62,11 @@ public class Maxwell {
 
 			try ( Connection schemaConnection = this.context.getMaxwellConnection() ) {
 				SchemaStoreSchema.upgradeSchemaStoreSchema(schemaConnection);
-				SchemaStoreSchema.handleMasterChange(schemaConnection, context.getServerID());
 			}
 
 			String producerClass = this.context.getProducer().getClass().getSimpleName();
-			LOGGER.info("Maxwell is booting (" + producerClass + "), starting at " + this.context.getInitialPosition());
+ 			initialPosition = getInitialPosition();
+			LOGGER.info("Maxwell is booting (" + producerClass + "), starting at " + initialPosition);
 		} catch ( SQLException e ) {
 			LOGGER.error("SQLException: " + e.getLocalizedMessage());
 			LOGGER.error(e.getLocalizedMessage());
@@ -55,7 +77,7 @@ public class Maxwell {
 		AbstractBootstrapper bootstrapper = this.context.getBootstrapper();
 
 		MysqlSchemaStore mysqlSchemaStore = new MysqlSchemaStore(this.context);
-		final MaxwellReplicator p = new MaxwellReplicator(mysqlSchemaStore, producer, bootstrapper, this.context, this.context.getInitialPosition());
+		final MaxwellReplicator p = new MaxwellReplicator(mysqlSchemaStore, producer, bootstrapper, this.context, initialPosition);
 
 		bootstrapper.resume(producer, p);
 

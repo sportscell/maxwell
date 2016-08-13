@@ -4,7 +4,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.zendesk.maxwell.BinlogPosition;
 import com.zendesk.maxwell.errors.DuplicateProcessException;
@@ -124,5 +126,47 @@ public class MysqlPositionStore {
 
 			return new BinlogPosition(rs.getLong("binlog_position"), rs.getString("binlog_file"));
 		}
+	}
+
+	/**
+	 * seeks out a position from a different server_id.
+	 *
+	 * @return a tuple of server_id, heartbeat
+	 */
+
+	public Pair<Long,Long> getRecoveryInfo() throws SQLException {
+		try ( Connection c = getConnection() ) {
+			return getRecoveryInfo(c);
+		}
+	}
+
+	private Pair<Long,Long> getRecoveryInfo(Connection c) throws SQLException {
+		ResultSet rs = c.createStatement().executeQuery("SELECT * from `positions`");
+		Long recoveryServerID = null, recoveryHeartbeat = null;
+
+		while ( rs.next() ) {
+			Long server_id = rs.getLong("server_id");
+			Long last_heartbeat_read = rs.getLong("last_heartbeat_read");
+
+			if ( recoveryServerID != null ) {
+				LOGGER.error("found multiple binlog positions for cluster.  Not attempting position recovery.");
+				LOGGER.error("found a row for server_id: " + recoveryServerID);
+				LOGGER.error("also found a row for server_id: " + server_id);
+				return null;
+			} else {
+				recoveryServerID = server_id;
+				recoveryHeartbeat = last_heartbeat_read;
+			}
+		}
+		if ( recoveryServerID != null ) {
+			return Pair.of(recoveryServerID, recoveryHeartbeat);
+		} else
+			return null;
+	}
+
+	protected BinlogPosition recoverFrom(long recoveryServerID, BinlogPosition position) {
+		LOGGER.info("Maxwell detected a master change (from server_id: " + recoveryServerID + " to server_id: " + this.serverID);
+		LOGGER.info("Attempting recovery @" + position);
+		return null;
 	}
 }
