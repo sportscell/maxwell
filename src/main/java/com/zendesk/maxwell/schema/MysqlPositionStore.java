@@ -135,7 +135,7 @@ public class MysqlPositionStore {
 	 */
 
 	public Pair<Long,Long> getRecoveryInfo() throws SQLException {
-		try ( Connection c = getConnection() ) {
+		try ( Connection c = connectionPool.getConnection() ) {
 			return getRecoveryInfo(c);
 		}
 	}

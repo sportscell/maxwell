@@ -36,12 +36,12 @@ public class MysqlSchemaStore extends AbstractSchemaStore implements SchemaStore
 		this.replayMode = replayMode;
 
 	}
-	public MysqlSchemaStore(MaxwellContext context) throws SQLException {
+	public MysqlSchemaStore(MaxwellContext context, BinlogPosition initialPosition) throws SQLException {
 		this(
 			context.getMaxwellConnectionPool(),
 			context.getReplicationConnectionPool(),
 			context.getServerID(),
-			context.getInitialPosition(),
+			initialPosition,
 			context.getCaseSensitivity(),
 			context.getFilter(),
 			context.getReplayMode()

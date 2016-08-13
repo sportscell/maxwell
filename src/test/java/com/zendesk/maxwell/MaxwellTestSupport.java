@@ -105,7 +105,7 @@ public class MaxwellTestSupport {
 		BinlogPosition start = BinlogPosition.capture(mysql.getConnection());
 		context.setPosition(start);
 
-		MysqlSchemaStore schemaStore = new MysqlSchemaStore(context);
+		MysqlSchemaStore schemaStore = new MysqlSchemaStore(context, context.getInitialPosition());
 		schemaStore.getSchema();
 
 		if ( transactional )

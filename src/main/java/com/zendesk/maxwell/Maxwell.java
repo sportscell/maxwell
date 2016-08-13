@@ -76,7 +76,7 @@ public class Maxwell {
 		AbstractProducer producer = this.context.getProducer();
 		AbstractBootstrapper bootstrapper = this.context.getBootstrapper();
 
-		MysqlSchemaStore mysqlSchemaStore = new MysqlSchemaStore(this.context);
+		MysqlSchemaStore mysqlSchemaStore = new MysqlSchemaStore(this.context, initialPosition);
 		final MaxwellReplicator p = new MaxwellReplicator(mysqlSchemaStore, producer, bootstrapper, this.context, initialPosition);
 
 		bootstrapper.resume(producer, p);
