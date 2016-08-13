@@ -9,13 +9,15 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import snaq.db.ConnectionPool;
+
 public class MaxwellMasterRecovery {
-	private final MaxwellContext context;
+	private final ConnectionPool replicationConnectionPool;
 	private final Long masterServerID, targetHeartbeat;
 	static final Logger LOGGER = LoggerFactory.getLogger(MaxwellMasterRecovery.class);
 
-	public MaxwellMasterRecovery(MaxwellContext context, Long masterServerID, Long targetHeartbeat) {
-		this.context = context;
+	public MaxwellMasterRecovery(ConnectionPool replicationConnectionPool, Long masterServerID, Long targetHeartbeat) {
+		this.replicationConnectionPool = replicationConnectionPool;
 		this.masterServerID = masterServerID;
 		this.targetHeartbeat = targetHeartbeat;
 	}
@@ -44,7 +46,7 @@ public class MaxwellMasterRecovery {
 
 	private List<BinlogPosition> getBinlogInfo() throws SQLException {
 		ArrayList<BinlogPosition> list = new ArrayList<>();
-		try ( Connection c = context.getReplicationConnection() ) {
+		try ( Connection c = replicationConnectionPool.getConnection() ) {
 			ResultSet rs = c.createStatement().executeQuery("SHOW BINARY LOGS");
 			while ( rs.next() ) {
 				list.add(BinlogPosition.at(4, rs.getString("Log_name")));

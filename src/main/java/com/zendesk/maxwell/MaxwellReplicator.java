@@ -1,5 +1,6 @@
 package com.zendesk.maxwell;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
@@ -132,17 +133,8 @@ public class MaxwellReplicator extends RunLoopProcess {
 		}
 	}
 
-	public void work() throws Exception {
-		RowMap row = getRow();
 
-		// todo: this is inelegant.  Ideally the outer code would just
-		// call this and tell us to stop if the positionThread is dead.
-		if ( positionStoreThread.getException() != null )
-			throw positionStoreThread.getException();
-
-		if (row == null)
-			return;
-
+	protected void processRow(RowMap row) throws Exception {
 		if ( isMaxwellRow(row) && row.getTable().equals("positions") ) {
 			Object heartbeat_at = row.getData("heartbeat_at");
 			if ( heartbeat_at != null ) {
@@ -155,7 +147,20 @@ public class MaxwellReplicator extends RunLoopProcess {
 		} else {
 			bootstrapper.work(row, producer, this);
 		}
+	}
 
+	public void work() throws Exception {
+		RowMap row = getRow();
+
+		// todo: this is inelegant.  Ideally the outer code would just
+		// call this and tell us to stop if the positionThread is dead.
+		if ( positionStoreThread.getException() != null )
+			throw positionStoreThread.getException();
+
+		if (row == null)
+			return;
+
+		processRow(row);
 	}
 
 	@Override

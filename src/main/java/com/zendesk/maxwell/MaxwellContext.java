@@ -133,6 +133,10 @@ public class MaxwellContext {
 		return this.getPositionStoreThread().getPosition();
 	}
 
+	public MysqlPositionStore getPositionStore() {
+		return this.positionStore;
+	}
+
 	public void ensurePositionThread() throws Exception {
 		if ( this.positionStoreThread == null )
 			return;

@@ -32,7 +32,8 @@ public class Maxwell {
 			Pair<Long, Long> recoveryInfo = this.context.getRecoveryInfo();
 
 			if ( recoveryInfo != null ) {
-				MaxwellMasterRecovery masterRecovery = new MaxwellMasterRecovery(this.context, recoveryInfo.getLeft(), recoveryInfo.getRight());
+				MaxwellMasterRecovery masterRecovery
+					= new MaxwellMasterRecovery(this.context.getReplicationConnectionPool(), recoveryInfo.getLeft(), recoveryInfo.getRight());
 				initial = masterRecovery.recover();
 			}
 		}

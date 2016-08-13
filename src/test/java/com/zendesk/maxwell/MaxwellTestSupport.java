@@ -36,7 +36,7 @@ public class MaxwellTestSupport {
 		return setupServer(null);
 	}
 
-	public static void setupSchema(MysqlIsolatedServer server) throws Exception {
+	public static void setupSchema(MysqlIsolatedServer server, boolean resetBinlogs) throws Exception {
 		List<String> queries = new ArrayList<String>(Arrays.asList(
 				"CREATE DATABASE if not exists shard_2",
 				"DROP DATABASE if exists shard_1",
@@ -55,11 +55,15 @@ public class MaxwellTestSupport {
 			}
 		}
 
-		queries.add("RESET MASTER");
+		if ( resetBinlogs )
+			queries.add("RESET MASTER");
 
 		server.executeList(queries);
 	}
 
+	public static void setupSchema(MysqlIsolatedServer server) throws Exception {
+		setupSchema(server, true);
+	}
 
 	public static String getSQLDir() {
 		 final String dir = System.getProperty("user.dir");
@@ -122,8 +126,9 @@ public class MaxwellTestSupport {
 
 		AbstractProducer producer = new AbstractProducer(context) {
 			@Override
-			public void push(RowMap r) {
+			public void push(RowMap r) throws Exception {
 				list.add(r);
+				context.setPosition(r);
 			}
 		};
 
@@ -194,8 +199,6 @@ public class MaxwellTestSupport {
 		List<String> diff = topSchema.diff(bottomSchema, "followed schema", "recaptured schema");
 		assertThat(StringUtils.join(diff.iterator(), "\n"), diff.size(), is(0));
 	}
-
-
 
 	public static  List<RowMap>getRowsForSQL(MysqlIsolatedServer server, MaxwellFilter filter, String queries[]) throws Exception {
 		return getRowsForSQL(server, null, filter, queries, null, false);

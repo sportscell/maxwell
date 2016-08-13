@@ -51,11 +51,7 @@ public class TestMaxwellReplicator extends MaxwellReplicator {
 					return;
 				}
 			}
-			if ( !bootstrapper.shouldSkip(row) && !isMaxwellRow(row) ) {
-				producer.push(row);
-			} else {
-				bootstrapper.work(row, this.producer, this);
-			}
+			processRow(row);
 		}
 	}
 
