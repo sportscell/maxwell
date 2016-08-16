@@ -6,6 +6,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+
+import com.zendesk.maxwell.MaxwellMasterRecoveryInfo;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.zendesk.maxwell.BinlogPosition;
@@ -47,7 +49,7 @@ public class MysqlPositionStore {
 		try( Connection c = connectionPool.getConnection() ){
 			PreparedStatement s = c.prepareStatement(sql);
 
-			LOGGER.debug("Writing binlog position to " + c.getCatalog() + ".positions: " + newPosition);
+			LOGGER.debug("Writing binlog position to " + c.getCatalog() + ".positions: " + newPosition + ", last_heartbeat: " + heartbeat);
 			s.setLong(1, serverID);
 			s.setString(2, newPosition.getFile());
 			s.setLong(3, newPosition.getOffset());
@@ -59,7 +61,7 @@ public class MysqlPositionStore {
 		}
 	}
 
-	public void heartbeat() throws Exception {
+	public synchronized void heartbeat() throws Exception {
 		try ( Connection c = connectionPool.getConnection() ) {
 			heartbeat(c);
 		}
@@ -101,6 +103,7 @@ public class MysqlPositionStore {
 		s.setLong(2, serverID);
 		s.setString(3, clientID);
 
+		LOGGER.debug("writing heartbeat: " + lastHeartbeat);
 		int nRows = s.executeUpdate();
 		if ( nRows != 1 ) {
 			String msg = String.format(
@@ -134,39 +137,30 @@ public class MysqlPositionStore {
 	 * @return a tuple of server_id, heartbeat
 	 */
 
-	public Pair<Long,Long> getRecoveryInfo() throws SQLException {
+	public MaxwellMasterRecoveryInfo getRecoveryInfo() throws SQLException {
 		try ( Connection c = connectionPool.getConnection() ) {
 			return getRecoveryInfo(c);
 		}
 	}
 
-	private Pair<Long,Long> getRecoveryInfo(Connection c) throws SQLException {
+	private MaxwellMasterRecoveryInfo getRecoveryInfo(Connection c) throws SQLException {
 		ResultSet rs = c.createStatement().executeQuery("SELECT * from `positions`");
-		Long recoveryServerID = null, recoveryHeartbeat = null;
+		MaxwellMasterRecoveryInfo info = null;
 
 		while ( rs.next() ) {
 			Long server_id = rs.getLong("server_id");
 			Long last_heartbeat_read = rs.getLong("last_heartbeat_read");
+			BinlogPosition position = BinlogPosition.at(rs.getLong("binlog_position"), rs.getString("binlog_file"));
 
-			if ( recoveryServerID != null ) {
+			if ( info != null ) {
 				LOGGER.error("found multiple binlog positions for cluster.  Not attempting position recovery.");
-				LOGGER.error("found a row for server_id: " + recoveryServerID);
+				LOGGER.error("found a row for server_id: " + info.serverID);
 				LOGGER.error("also found a row for server_id: " + server_id);
 				return null;
 			} else {
-				recoveryServerID = server_id;
-				recoveryHeartbeat = last_heartbeat_read;
+				info = new MaxwellMasterRecoveryInfo(position, last_heartbeat_read, server_id);
 			}
 		}
-		if ( recoveryServerID != null ) {
-			return Pair.of(recoveryServerID, recoveryHeartbeat);
-		} else
-			return null;
-	}
-
-	protected BinlogPosition recoverFrom(long recoveryServerID, BinlogPosition position) {
-		LOGGER.info("Maxwell detected a master change (from server_id: " + recoveryServerID + " to server_id: " + this.serverID);
-		LOGGER.info("Attempting recovery @" + position);
-		return null;
+		return info;
 	}
 }

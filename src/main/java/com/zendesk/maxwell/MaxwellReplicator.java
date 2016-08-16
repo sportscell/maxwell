@@ -1,6 +1,5 @@
 package com.zendesk.maxwell;
 
-import java.io.IOException;
 import java.sql.SQLException;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
@@ -117,10 +116,14 @@ public class MaxwellReplicator extends RunLoopProcess {
 		}
 	}
 
+	public void startReplicator() throws Exception {
+		this.replicator.start();
+	}
+
 	@Override
 	protected void beforeStart() throws Exception {
 		try {
-			this.replicator.start();
+			startReplicator();
 		} catch ( TransportException e ) {
 			switch ( e.getErrorCode() ) {
 				case 1236:
@@ -135,13 +138,6 @@ public class MaxwellReplicator extends RunLoopProcess {
 
 
 	protected void processRow(RowMap row) throws Exception {
-		if ( isMaxwellRow(row) && row.getTable().equals("positions") ) {
-			Object heartbeat_at = row.getData("heartbeat_at");
-			if ( heartbeat_at != null ) {
-				lastHeartbeatRead = (Long) heartbeat_at;
-			}
-		}
-
 		if ( !bootstrapper.shouldSkip(row) && !isMaxwellRow(row) ) {
 			producer.push(row);
 		} else {
@@ -152,8 +148,9 @@ public class MaxwellReplicator extends RunLoopProcess {
 	public void work() throws Exception {
 		RowMap row = getRow();
 
-		// todo: this is inelegant.  Ideally the outer code would just
-		// call this and tell us to stop if the positionThread is dead.
+		// todo: this is inelegant.  Ideally the outer code would monitor the
+		// position thread and stop us if it was dead.
+
 		if ( positionStoreThread.getException() != null )
 			throw positionStoreThread.getException();
 
@@ -163,10 +160,14 @@ public class MaxwellReplicator extends RunLoopProcess {
 		processRow(row);
 	}
 
-	@Override
-	protected void beforeStop() throws Exception {
+	public void stopReplicator() throws Exception {
 		this.binlogEventListener.stop();
 		this.replicator.stop(5, TimeUnit.SECONDS);
+	}
+
+	@Override
+	protected void beforeStop() throws Exception {
+		stopReplicator();
 	}
 
 	protected boolean isMaxwellRow(RowMap row) {
@@ -311,6 +312,27 @@ public class MaxwellReplicator extends RunLoopProcess {
 		}
 	}
 
+	public Long getLastHeartbeatRead() {
+		return lastHeartbeatRead;
+	}
+
+	private void processHeartbeats(RowMap row) throws SQLException {
+		if ( row != null && isMaxwellRow(row) && row.getTable().equals("positions") ) {
+			Object heartbeat_at = row.getData("heartbeat_at");
+			if ( heartbeat_at != null ) {
+				Long thisHeartbeat = (Long) heartbeat_at;
+				if ( !thisHeartbeat.equals(lastHeartbeatRead) ) {
+					lastHeartbeatRead = thisHeartbeat;
+
+					if (this.producer != null) {
+						BinlogPosition position = new BinlogPosition(row.getPosition().getOffset(), row.getPosition().getFile(), lastHeartbeatRead);
+						this.producer.writePosition(position);
+					}
+				}
+			}
+		}
+	}
+
 	private RowMapBuffer rowBuffer;
 
 	public RowMap getRow() throws Exception {
@@ -318,7 +340,11 @@ public class MaxwellReplicator extends RunLoopProcess {
 
 		while (true) {
 			if (rowBuffer != null && !rowBuffer.isEmpty()) {
-				return rowBuffer.removeFirst();
+				RowMap row = rowBuffer.removeFirst();
+
+				processHeartbeats(row);
+
+				return row;
 			}
 
 			v4Event = pollV4EventFromQueue();
@@ -374,7 +400,9 @@ public class MaxwellReplicator extends RunLoopProcess {
 
 		schemaStore.processSQL(sql, dbName, position);
 		tableCache.clear();
-		this.producer.writePosition(position);
+
+		if ( this.producer != null )
+			this.producer.writePosition(position);
 	}
 
 	public Schema getSchema() throws SchemaStoreException {

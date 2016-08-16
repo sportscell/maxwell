@@ -1,6 +1,7 @@
 package com.zendesk.maxwell;
 
 import com.zendesk.maxwell.schema.MysqlPositionStore;
+import com.zendesk.maxwell.schema.MysqlSchemaStore;
 import com.zendesk.maxwell.schema.SchemaStoreSchema;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -56,19 +57,30 @@ public class MaxwellMasterRecoveryTest {
 		store.set(BinlogPosition.capture(masterServer.getConnection()));
 		masterContext.getPositionStore().heartbeat();
 
-		// now the getRowsForSQL will trigger a read of that heartbeat.
-		String input[] = {"insert into shard_1.minimal set account_id = 1, text_field='row 1'"};
-		list = MaxwellTestSupport.getRowsForSQL(masterServer, getContext(masterServer.getPort()), null, input, null, false);
+		String input[] = new String[5000];
+		for ( int i = 0 ; i < 5000; i++ )
+			input[i] = String.format("insert into shard_1.minimal set account_id = %d, text_field='row %d'", i, i);
 
+		// now the getRowsForSQL will trigger a read of that heartbeat.
+
+		MaxwellTestSupport.getRowsForSQL(masterServer, getContext(masterServer.getPort()), null, input, null, false);
+
+		Thread.sleep(3000); // try to make sure master is flushed -> slave
 		BinlogPosition masterPosition = BinlogPosition.capture(masterServer.getConnection());
 		BinlogPosition slavePosition = BinlogPosition.capture(slaveServer.getConnection());
 
 		System.out.println("master: " + masterPosition + " slave: " + slavePosition);
 
-		Pair<Long, Long> recoveryInfo = slaveContext.getRecoveryInfo();
+		MaxwellMasterRecoveryInfo recoveryInfo = slaveContext.getRecoveryInfo();
 
-		MaxwellMasterRecovery recovery
-			= new MaxwellMasterRecovery(slaveContext.getReplicationConnectionPool(), recoveryInfo.getLeft(), recoveryInfo.getRight());
+		MaxwellConfig config = getConfig(masterServer.getPort());
+		MaxwellMasterRecovery recovery = new MaxwellMasterRecovery(
+			config.maxwellMysql,
+			config.databaseName,
+			new MysqlSchemaStore(slaveContext, null),
+			slaveContext.getReplicationConnectionPool(),
+			recoveryInfo
+		);
 
 		BinlogPosition recoveredPosition = recovery.recover();
 		assertEquals(slavePosition, recoveredPosition);

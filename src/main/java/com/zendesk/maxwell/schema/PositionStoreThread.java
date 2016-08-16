@@ -49,10 +49,14 @@ public class PositionStoreThread extends RunLoopProcess implements Runnable {
 			LOGGER.info("Storing final position: " + position);
 			try {
 				store.set(position);
-			} catch ( SQLException e ) {
+			} catch ( Exception e ) {
 				LOGGER.error("error storing final position: " + e);
 			}
 		}
+	}
+
+	public void heartbeat() throws Exception {
+		store.heartbeat();
 	}
 
 	public void work() throws Exception {
@@ -64,6 +68,7 @@ public class PositionStoreThread extends RunLoopProcess implements Runnable {
 		}
 
 		try { Thread.sleep(1000); } catch (InterruptedException e) { }
+		store.heartbeat();
 	}
 
 	public synchronized void setPosition(BinlogPosition p) {

@@ -39,7 +39,6 @@ public class TestMaxwellReplicator extends MaxwellReplicator {
 			}
 			else if ( row == null ) {
 				if ( shouldStop ) {
-					hardStop();
 					return;
 				}
 
@@ -47,17 +46,11 @@ public class TestMaxwellReplicator extends MaxwellReplicator {
 					max_tries--;
 					continue;
 				} else {
-					hardStop();
 					return;
 				}
 			}
 			processRow(row);
 		}
-	}
-
-	private void hardStop() throws Exception {
-		this.binlogEventListener.stop();
-		this.replicator.stop(5, TimeUnit.SECONDS);
 	}
 
 	@Override

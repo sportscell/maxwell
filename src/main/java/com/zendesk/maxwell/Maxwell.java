@@ -5,16 +5,13 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.concurrent.TimeoutException;
 import com.djdch.log4j.StaticShutdownCallbackRegistry;
+import com.zendesk.maxwell.schema.*;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.zendesk.maxwell.bootstrap.AbstractBootstrapper;
 import com.zendesk.maxwell.producer.AbstractProducer;
-import com.zendesk.maxwell.schema.Schema;
-import com.zendesk.maxwell.schema.SchemaCapturer;
-import com.zendesk.maxwell.schema.MysqlSchemaStore;
-import com.zendesk.maxwell.schema.SchemaStoreSchema;
 import com.zendesk.maxwell.schema.ddl.InvalidSchemaError;
 
 public class Maxwell {
@@ -26,14 +23,22 @@ public class Maxwell {
 		this.config = config;
 	}
 
-	protected BinlogPosition getInitialPosition() throws SQLException {
+	protected BinlogPosition getInitialPosition() throws Exception {
 		BinlogPosition initial = this.context.getInitialPosition();
 		if ( initial == null ) {
-			Pair<Long, Long> recoveryInfo = this.context.getRecoveryInfo();
+			MaxwellMasterRecoveryInfo recoveryInfo = this.context.getRecoveryInfo();
 
 			if ( recoveryInfo != null ) {
-				MaxwellMasterRecovery masterRecovery
-					= new MaxwellMasterRecovery(this.context.getReplicationConnectionPool(), recoveryInfo.getLeft(), recoveryInfo.getRight());
+				SchemaStore tempSchemaStore = new MysqlSchemaStore(this.context, null);
+
+				MaxwellMasterRecovery masterRecovery = new MaxwellMasterRecovery(
+					config.replicationMysql,
+					config.databaseName,
+					tempSchemaStore,
+					this.context.getReplicationConnectionPool(),
+					recoveryInfo
+				);
+
 				initial = masterRecovery.recover();
 			}
 		}

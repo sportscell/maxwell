@@ -86,6 +86,10 @@ public class MaxwellContext {
 		new Thread(s, "maxwell-schema-scavenger").start();
 	}
 
+	public void heartbeat() throws Exception {
+		this.positionStore.heartbeat();
+	}
+
 	public void terminate() {
 		if ( this.positionStoreThread != null ) {
 			try {
@@ -116,7 +120,7 @@ public class MaxwellContext {
 		return this.initialPosition;
 	}
 
-	public Pair<Long,Long> getRecoveryInfo() throws SQLException {
+	public MaxwellMasterRecoveryInfo getRecoveryInfo() throws SQLException {
 		return this.positionStore.getRecoveryInfo();
 	}
 

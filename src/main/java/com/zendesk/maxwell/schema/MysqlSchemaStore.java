@@ -14,10 +14,12 @@ import java.util.List;
 
 public class MysqlSchemaStore extends AbstractSchemaStore implements SchemaStore {
 	private final ConnectionPool maxwellConnectionPool;
+	private final ConnectionPool replicationConnectionPool;
 	private final BinlogPosition initialPosition;
 	private final CaseSensitivity caseSensitivity;
 	private final Long serverID;
 	private final boolean replayMode;
+	private final MaxwellFilter filter;
 
 	private MysqlSavedSchema savedSchema;
 
@@ -29,8 +31,11 @@ public class MysqlSchemaStore extends AbstractSchemaStore implements SchemaStore
 							MaxwellFilter filter,
 							boolean replayMode) {
 		super(replicationConnectionPool, caseSensitivity, filter);
+
+		this.replicationConnectionPool = replicationConnectionPool;
 		this.caseSensitivity = caseSensitivity;
 		this.serverID = serverID;
+		this.filter = filter;
 		this.maxwellConnectionPool = maxwellConnectionPool;
 		this.initialPosition = initialPosition;
 		this.replayMode = replayMode;
@@ -86,6 +91,10 @@ public class MysqlSchemaStore extends AbstractSchemaStore implements SchemaStore
 			}
 		}
 		return resolvedSchemaChanges;
+	}
+
+	public SchemaStore clone(Long serverID, BinlogPosition position) {
+		return new MysqlSchemaStore(maxwellConnectionPool, replicationConnectionPool, serverID, position, caseSensitivity, filter, replayMode);
 	}
 
 	private void saveSchema(Schema updatedSchema, List<ResolvedSchemaChange> changes, BinlogPosition p) throws SQLException {

@@ -11,6 +11,8 @@ import com.zendesk.maxwell.schema.SchemaStoreSchema;
 import com.zendesk.maxwell.schema.ddl.ResolvedSchemaChange;
 import com.zendesk.maxwell.schema.ddl.SchemaChange;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -24,6 +26,8 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 public class MaxwellTestSupport {
+	static final Logger LOGGER = LoggerFactory.getLogger(MaxwellTestSupport.class);
+
 	public static MysqlIsolatedServer setupServer(String extraParams) throws Exception {
 		MysqlIsolatedServer server = new MysqlIsolatedServer();
 		server.boot(extraParams);
@@ -159,9 +163,23 @@ public class MaxwellTestSupport {
 
 		p.getEvents(producer);
 
-		bootstrapper.join();
 
+		LOGGER.debug("sending last heartbeat....");
+		context.heartbeat(); // send final heartbeat through
+
+		LOGGER.debug("processing last events....");
+		RowMap r = p.getRow();
+
+		while ( r != null ) {
+			LOGGER.debug(r.toJSON());
+			p.processRow(r);
+			r = p.getRow();
+		}
+
+
+		bootstrapper.join();
 		p.stopLoop();
+		LOGGER.debug("done.");
 
 		context.terminate();
 
