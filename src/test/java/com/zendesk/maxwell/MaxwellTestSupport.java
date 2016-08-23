@@ -19,6 +19,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
@@ -67,7 +68,7 @@ public class MaxwellTestSupport {
 	}
 
 
-	public static MaxwellContext buildContext(int port, BinlogPosition p, MaxwellFilter filter) {
+	public static MaxwellContext buildContext(int port, BinlogPosition p, MaxwellFilter filter) throws Exception {
 		MaxwellConfig config = new MaxwellConfig();
 
 		config.replicationMysql.host = "127.0.0.1";
@@ -104,7 +105,7 @@ public class MaxwellTestSupport {
 		BinlogPosition start = BinlogPosition.capture(mysql.getConnection());
 		context.setPosition(start);
 
-		MysqlSchemaStore schemaStore = new MysqlSchemaStore(context);
+		MysqlSchemaStore schemaStore = new MysqlSchemaStore(context, context.getInitialPosition());
 		schemaStore.getSchema();
 
 		if ( transactional )
@@ -158,6 +159,58 @@ public class MaxwellTestSupport {
 		p.stopLoop();
 
 		context.terminate();
+
+		return list;
+	}
+
+	public static List<RowMap>getRowsWithReplicator(final MysqlIsolatedServer mysql, MaxwellFilter filter, String queries[], String before[]) throws Exception {
+		final ArrayList<RowMap> list = new ArrayList<>();
+
+		clearSchemaStore(mysql);
+
+		MaxwellConfig config = new MaxwellConfig();
+
+		config.maxwellMysql.user = "maxwell";
+		config.maxwellMysql.password = "maxwell";
+		config.maxwellMysql.port = mysql.getPort();
+		config.replicationMysql.port = mysql.getPort();
+		config.filter = filter;
+		config.producerType = "buffer";
+
+		if ( before != null)
+			mysql.executeList(Arrays.asList(before));
+		mysql.execute("CREATE TABLE if not exists test.boundary ( i int )");
+
+		Maxwell maxwell = new Maxwell(config);
+		maxwell.init();
+
+		new Thread(maxwell).start();
+
+		// insert a row and pick it up.  this will ensure we have a binlog position for heartbeating
+		while ( maxwell.getRow(5, TimeUnit.MILLISECONDS) == null ) {
+			mysql.execute("insert into test.boundary set i = 1");
+		}
+
+		// now create the data.
+		mysql.executeList(Arrays.asList(queries));
+
+		BinlogPosition finalPosition = BinlogPosition.capture(mysql.getConnection());
+
+		// add a final row to ensure we pick up all the data
+		mysql.execute("insert into test.boundary set i = 1");
+
+		for ( ;; ) {
+			RowMap row = maxwell.getRow(10, TimeUnit.MILLISECONDS);
+			if ( row == null )
+				continue;
+
+			if ( row.getPosition().newerThan(finalPosition) )
+				break;
+
+			list.add(row);
+		}
+
+		maxwell.terminate();
 
 		return list;
 	}

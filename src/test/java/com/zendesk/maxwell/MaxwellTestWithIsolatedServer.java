@@ -37,11 +37,11 @@ public class MaxwellTestWithIsolatedServer {
 		MaxwellTestJSON.runJSONTestFile(server, filename);
 	}
 
-	protected MaxwellContext buildContext() {
+	protected MaxwellContext buildContext() throws Exception {
 		return MaxwellTestSupport.buildContext(server.getPort(), null, null);
 	}
 
-	protected MaxwellContext buildContext(BinlogPosition p) {
+	protected MaxwellContext buildContext(BinlogPosition p) throws Exception {
 		return MaxwellTestSupport.buildContext(server.getPort(), p, null);
 	}
 }
