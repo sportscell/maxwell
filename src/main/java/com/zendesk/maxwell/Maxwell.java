@@ -1,20 +1,16 @@
 package com.zendesk.maxwell;
 
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.concurrent.TimeoutException;
 import com.djdch.log4j.StaticShutdownCallbackRegistry;
+import com.zendesk.maxwell.bootstrap.AbstractBootstrapper;
+import com.zendesk.maxwell.producer.AbstractProducer;
+import com.zendesk.maxwell.schema.MysqlSchemaStore;
+import com.zendesk.maxwell.schema.SchemaStoreSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.zendesk.maxwell.bootstrap.AbstractBootstrapper;
-import com.zendesk.maxwell.producer.AbstractProducer;
-import com.zendesk.maxwell.schema.Schema;
-import com.zendesk.maxwell.schema.SchemaCapturer;
-import com.zendesk.maxwell.schema.MysqlSchemaStore;
-import com.zendesk.maxwell.schema.SchemaStoreSchema;
-import com.zendesk.maxwell.schema.ddl.InvalidSchemaError;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.concurrent.TimeoutException;
 
 public class Maxwell {
 	private MaxwellConfig config;
@@ -53,7 +49,9 @@ public class Maxwell {
 		AbstractBootstrapper bootstrapper = this.context.getBootstrapper();
 
 		MysqlSchemaStore mysqlSchemaStore = new MysqlSchemaStore(this.context);
-		final MaxwellReplicator p = new MaxwellReplicator(mysqlSchemaStore, producer, bootstrapper, this.context, this.context.getInitialPosition());
+
+
+		final MaxwellReplicator p = MaxwellReplicatorFactory.getMaxwellReplicator(mysqlSchemaStore, producer, bootstrapper, this.context, this.context.getInitialPosition());
 
 		bootstrapper.resume(producer, p);
 
