@@ -1,13 +1,16 @@
 package com.zendesk.maxwell;
 
-import java.util.*;
-
-import joptsimple.*;
-
+import com.zendesk.maxwell.util.AbstractConfig;
+import joptsimple.BuiltinHelpFormatter;
+import joptsimple.OptionDescriptor;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.zendesk.maxwell.util.AbstractConfig;
+import java.util.Enumeration;
+import java.util.Map;
+import java.util.Properties;
 
 public class MaxwellConfig extends AbstractConfig {
 	static final Logger LOGGER = LoggerFactory.getLogger(MaxwellConfig.class);
@@ -37,10 +40,12 @@ public class MaxwellConfig extends AbstractConfig {
 
 	public BinlogPosition initPosition;
 	public boolean replayMode;
+	public boolean haMode;
 
 	public MaxwellConfig() { // argv is only null in tests
 		this.kafkaProperties = new Properties();
 		this.replayMode = false;
+		this.haMode = false;
 		this.replicationMysql = new MaxwellMysqlConfig();
 		this.maxwellMysql = new MaxwellMysqlConfig();
 		setup(null, null); // setup defaults
@@ -107,6 +112,10 @@ public class MaxwellConfig extends AbstractConfig {
 
 		parser.accepts( "__separator_7" );
 
+		parser.accepts( "ha", "determind whether HA Mode or Single Mode to run, foramtted as --ha=true|false, default value is false").withOptionalArg();
+
+		parser.accepts( "__separator_8" );
+
 		parser.accepts( "help", "display help").forHelp();
 
 		BuiltinHelpFormatter helpFormatter = new BuiltinHelpFormatter(200, 4) {
@@ -151,6 +160,15 @@ public class MaxwellConfig extends AbstractConfig {
 			}
 			return null; // unreached
 		}
+	}
+
+	private Boolean fetchBooleanOption(String name, OptionSet options, Properties properties, Boolean defaultVal) {
+		if ( options != null && options.has(name) )
+			return Boolean.valueOf( (String) options.valueOf(name) );
+		else if ( (properties != null) && properties.containsKey(name) )
+			return Boolean.valueOf( properties.getProperty(name) );
+		else
+			return defaultVal;
 	}
 
 
@@ -223,6 +241,8 @@ public class MaxwellConfig extends AbstractConfig {
 		this.excludeColumns     = fetchOption("exclude_columns", options, properties, null);
 		this.blacklistDatabases = fetchOption("blacklist_dbs", options, properties, null);
 		this.blacklistTables    = fetchOption("blacklist_tables", options, properties, null);
+
+		this.haMode = fetchBooleanOption("ha", options, properties, false);
 
 		if ( options != null && options.has("init_position")) {
 			String initPosition = (String) options.valueOf("init_position");
