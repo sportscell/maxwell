@@ -40,12 +40,12 @@ public class MaxwellConfig extends AbstractConfig {
 
 	public BinlogPosition initPosition;
 	public boolean replayMode;
-	public boolean haMode;
+	public MaxwellRunningMode runningMode;
 
 	public MaxwellConfig() { // argv is only null in tests
 		this.kafkaProperties = new Properties();
 		this.replayMode = false;
-		this.haMode = false;
+		this.runningMode = MaxwellRunningMode.SINGLE_MODE;
 		this.replicationMysql = new MaxwellMysqlConfig();
 		this.maxwellMysql = new MaxwellMysqlConfig();
 		setup(null, null); // setup defaults
@@ -162,16 +162,6 @@ public class MaxwellConfig extends AbstractConfig {
 		}
 	}
 
-	private Boolean fetchBooleanOption(String name, OptionSet options, Properties properties, Boolean defaultVal) {
-		if ( options != null && options.has(name) )
-			return Boolean.valueOf( (String) options.valueOf(name) );
-		else if ( (properties != null) && properties.containsKey(name) )
-			return Boolean.valueOf( properties.getProperty(name) );
-		else
-			return defaultVal;
-	}
-
-
 	private MaxwellMysqlConfig parseMysqlConfig(String prefix, OptionSet options, Properties properties) {
 		MaxwellMysqlConfig config = new MaxwellMysqlConfig();
 		config.host     = fetchOption(prefix + "host", options, properties, null);
@@ -242,8 +232,6 @@ public class MaxwellConfig extends AbstractConfig {
 		this.blacklistDatabases = fetchOption("blacklist_dbs", options, properties, null);
 		this.blacklistTables    = fetchOption("blacklist_tables", options, properties, null);
 
-		this.haMode = fetchBooleanOption("ha", options, properties, false);
-
 		if ( options != null && options.has("init_position")) {
 			String initPosition = (String) options.valueOf("init_position");
 			String[] initPositionSplit = initPosition.split(":");
@@ -263,6 +251,10 @@ public class MaxwellConfig extends AbstractConfig {
 
 		if ( options != null && options.has("replay")) {
 			this.replayMode = true;
+		}
+
+		if (options != null && options.has("ha")) {
+			this.runningMode = Boolean.valueOf( (String) options.valueOf("ha") ) ? MaxwellRunningMode.ACTIVE_STANDBY_MODE : MaxwellRunningMode.SINGLE_MODE;
 		}
 	}
 
